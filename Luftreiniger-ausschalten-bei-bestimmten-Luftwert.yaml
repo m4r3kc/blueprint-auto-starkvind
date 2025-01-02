@@ -1,0 +1,99 @@
+blueprint:
+  name: Luftreiniger Auto-Schaltung (Einfach)
+  description: |
+    <br>
+    <b>📘Dieser Blueprint schaltet den Luftreiniger nach Entität, Schalter oder Schalter am Gerät ein und automatisch wieder aus. Zeitversatz nachdem die Aktion ausgeführt wird liegt bei 3min.</b>
+    <br><br>
+    📅 <b>Schalter oder Entität</b>: Luftreiniger wird nach Schalter oder Entität eingeschaltet und nach gesetztem Luftwert automatisch wieder abgeschaltet.<br>
+    ⏰ <b>Automatische Abschaltung</b>: Luftreiniger wird nach gesetztem Luftwert und manueller Auslösung am Gerät automatisch wieder abgeschaltet.
+  domain: automation
+  input:
+    manual_toggle:
+      name: Schalters bzw. Entität
+      description: Schalter oder Entität, um den Luftreiniger manuell zu aktivieren und automatisch abzuschalten.
+      selector:
+        entity:
+          domain: 
+            - input_boolean
+            - switch
+            - light
+            - fan
+            - binary_sensor
+    manual_toggle_state:
+      name: Zustand des Schalters bzw. der Entität
+      description: Zustand, bei dem die Automatisierung ausgelöst wird (on oder off).
+      default: "on"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+    pm2_5_sensor:
+      name: PM2.5 Sensor
+      description: PM2.5 Sensor für den Hauptluftreiniger
+      selector:
+        entity:
+          domain: sensor
+    fan_entity:
+      name: Luftreiniger Entität
+      description: Entität des Hauptluftreinigers
+      selector:
+        entity:
+          domain: fan
+    ppm_threshold:
+      name: PM2.5 Grenzwert
+      description: Grenzwert (PPM) für das Abschalten des Luftreinigers
+      default: 50
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+
+trigger:
+  - platform: state
+    entity_id: !input pm2_5_sensor
+    id: autooff
+  - platform: state
+    entity_id: !input manual_toggle
+    to: !input manual_toggle_state
+    id: manual
+
+condition: []
+
+action:
+  - choose:
+      # Automatische Steuerung basierend auf PM2.5
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'autooff' }}"
+          - condition: state
+            entity_id: !input fan_entity
+            state: "on"
+        sequence:
+          - delay:
+              minutes: 3  # 3 Minuten warten, um den realen PM2.5-Wert zu ermitteln
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            below: !input ppm_threshold  # Prüfen, ob der PM2.5-Wert unter dem Grenzwert liegt
+          - service: fan.turn_off
+            target:
+              entity_id: !input fan_entity
+      # Manuelle Steuerung
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'manual' }}"
+        sequence:
+          - service: fan.turn_on
+            target:
+              entity_id: !input fan_entity
+          - delay:
+              minutes: 3  # 3 Minuten warten, um den realen PM2.5-Wert zu ermitteln
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            below: !input ppm_threshold  # Prüfen, ob der PM2.5-Wert unter dem Grenzwert liegt
+          - service: fan.turn_off
+            target:
+              entity_id: !input fan_entity
+
+mode: single
