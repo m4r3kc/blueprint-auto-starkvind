@@ -4,7 +4,7 @@
 
 🎛️ Schalter oder Entität: Luftreiniger wird nach Schalter oder Entität eingeschaltet und nach gesetztem Luftwert automatisch wieder abgeschaltet. 
 
-📅 Bereiche in den Luftreiniger stehen können ausgewählt werden (Mehrfachauswahl an Luftreinigern mögl.)
+📅 Bereiche in denen Luftreiniger stehen können ausgewählt werden (Mehrfachauswahl an Luftreinigern mögl.)
 
 ⏰ Automatische Abschaltung: Luftreiniger wird nach gesetztem Luftwert und manueller Auslösung am Gerät automatisch wieder abgeschaltet.
 
