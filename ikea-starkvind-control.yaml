@@ -1,16 +1,17 @@
 blueprint:
-  name: Automatyczne sterowanie oczyszczaczem powietrza (wieloma)
+  name: Automatyczne sterowanie oczyszczaczem powietrza (wieloma) z trybem manualnym
   description: |
     <br>
-    <b>📘Ten Blueprint włącza i automatycznie wyłącza wiele oczyszczaczy powietrza na podstawie encji, przełączników lub ręcznych przełączników na urządzeniu. Opóźnienie po wykonaniu akcji wynosi 3 minuty.</b>
+    <b>📘Ten Blueprint włącza i automatycznie steruje trybem oczyszczaczy powietrza na podstawie encji, przełączników lub ręcznych przełączników na urządzeniu oraz poziomu PM2.5.</b>
     <br><br>
-    📅 <b>Przełączniki, encje, obszary</b>: Oczyszczacze powietrza są włączane przez przełącznik, encję lub obszar i automatycznie wyłączane po osiągnięciu ustawionego poziomu jakości powietrza.<br>
-    ⏰ <b>Automatyczne wyłączanie</b>: Oczyszczacze powietrza są automatycznie wyłączane po osiągnięciu ustawionego poziomu jakości powietrza i ręcznym uruchomieniu na urządzeniu.
+    📅 <b>Przełączniki, encje, obszary</b>: Oczyszczacze powietrza są włączane przez przełącznik, encję lub obszar.<br>
+    💨 <b>Automatyczny tryb manualny</b>: Oczyszczacze powietrza przełączają się w tryb manualny, gdy poziom PM2.5 wzrośnie powyżej zdefiniowanego progu.<br>
+    📉 <b>Automatyczny tryb auto</b>: Oczyszczacze powietrza przełączają się w tryb auto, gdy poziom PM2.5 spadnie poniżej ustawionego progu.
   domain: automation
   input:
     manual_toggle:
-      name: Przełącznik lub encja
-      description: Przełącznik lub encja do ręcznego włączania oczyszczacza powietrza (wyłączanie automatyczne).
+      name: Przełącznik lub encja manualna
+      description: Przełącznik lub encja do ręcznego włączania oczyszczacza powietrza.
       selector:
         entity:
           domain:
@@ -20,8 +21,8 @@ blueprint:
             - fan
             - binary_sensor
     manual_toggle_state:
-      name: Stan przełącznika lub encji
-      description: Stan, w którym automatyzacja jest wyzwalana (włączony lub wyłączony)
+      name: Stan przełącznika lub encji manualnej
+      description: Stan, w którym automatyzacja manualna jest wyzwalana (włączony lub wyłączony)
       default: "on"
       selector:
         select:
@@ -35,13 +36,31 @@ blueprint:
         entity:
           domain: sensor
     ppm_threshold:
-      name: Próg PM2.5
-      description: Próg (PPM) dla wyłączania oczyszczaczy powietrza
+      name: Próg PM2.5 dla trybu auto
+      description: Próg (PPM) dla przełączenia oczyszczaczy powietrza w tryb auto.
       default: 50
       selector:
         number:
           min: 1
           max: 120
+          step: 1
+    ppm_increase_threshold:
+      name: Próg wzrostu PM2.5 dla trybu manualnego
+      description: Próg wzrostu (PPM) powyżej progu auto, dla przełączenia w tryb manualny.
+      default: 30
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+    manual_mode_percentage:
+      name: Procent mocy w trybie manualnym
+      description: Procent mocy wentylatora ustawiany w trybie manualnym (0-100).
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 100
           step: 1
     fan_entities:
       name: Oczyszczacze powietrza
@@ -54,7 +73,7 @@ blueprint:
 trigger:
   - platform: state
     entity_id: !input pm2_5_sensor
-    id: autooff
+    id: pm25_change
   - platform: state
     entity_id: !input manual_toggle
     to: !input manual_toggle_state
@@ -64,20 +83,33 @@ condition: []
 
 action:
   - choose:
-      # Automatyczne sterowanie oparte na PM2.5
+      # Sterowanie oparte na PM2.5
       - conditions:
           - condition: template
-            value_template: "{{ trigger.id == 'autooff' }}"
+            value_template: "{{ trigger.id == 'pm25_change' }}"
         sequence:
           - delay:
-              minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5
-          - condition: numeric_state
-            entity_id: !input pm2_5_sensor
-            below: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest poniżej progu
-          - service: fan.set_preset_mode
-            target: !input fan_entities
-            data:
-              preset_mode: auto
+              minutes: 3  # Poczekaj 3 minuty, aby ustabilizować wartość PM2.5
+          - choose:
+              - conditions:
+                  - condition: numeric_state
+                    entity_id: !input pm2_5_sensor
+                    below: !input ppm_threshold # Sprawdź, czy PM2.5 jest poniżej progu auto
+                sequence:
+                  - service: fan.set_preset_mode
+                    target: !input fan_entities
+                    data:
+                      preset_mode: auto
+              - conditions:
+                  - condition: numeric_state
+                    entity_id: !input pm2_5_sensor
+                    above: "{{ float(input_ppm_threshold) + float(input_ppm_increase_threshold) }}" # Sprawdź, czy PM2.5 jest powyżej progu manual
+                sequence:
+                  - service: fan.set_percentage
+                    target: !input fan_entities
+                    data:
+                      percentage: !input manual_mode_percentage
+            default: [] # Nic nie rób, jeśli PM2.5 jest pomiędzy progami
       # Ręczne sterowanie
       - conditions:
           - condition: template
@@ -86,11 +118,10 @@ action:
           - service: fan.turn_on
             target: !input fan_entities
           - delay:
-              minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5
+              minutes: 3
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
-            below: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest poniżej progu
+            below: !input ppm_threshold # Sprawdź, czy PM2.5 jest poniżej progu auto po ręcznym włączeniu i wyłącz jeśli tak
           - service: fan.turn_off
             target: !input fan_entities
-
 mode: single
