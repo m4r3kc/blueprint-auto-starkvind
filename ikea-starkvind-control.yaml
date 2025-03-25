@@ -98,8 +98,10 @@ action:
               - conditions:
                   - condition: template
                     value_template: >
-                      {{ states('!input pm2_5_sensor') | float >
-                         (!input ppm_threshold + !input ppm_increase_threshold) | float }}
+                      {{
+                        states('sensor.' + trigger.to_state.entity_id.split('.')[1]) | float >
+                        (ppm_threshold + ppm_increase_threshold)
+                      }}
                 sequence:
                   - service: fan.set_percentage
                     target: !input fan_entities
