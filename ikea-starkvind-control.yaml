@@ -91,7 +91,7 @@ action:
           - delay:
               minutes: 3  # Poczekaj 3 minuty, aby ustabilizować wartość PM2.5
           - variables: # Dodajemy sekcję variables
-              manual_threshold: "{{ float(inputs.ppm_threshold) + float(inputs.ppm_increase_threshold) }}" # Oblicz próg manualny i zapisz jako zmienną
+              manual_threshold_str: "{{ (float(inputs.ppm_threshold) + float(inputs.ppm_increase_threshold)) | string }}" # Oblicz próg manualny i zapisz jako STRING
           - choose:
               - conditions:
                   - condition: numeric_state
@@ -105,7 +105,7 @@ action:
               - conditions:
                   - condition: numeric_state
                     entity_id: !input pm2_5_sensor
-                    above: "{{ manual_threshold }}" # Użyj zmiennej manual_threshold
+                    above: "{{ manual_threshold_str }}" # Użyj STRINGA manual_threshold_str w above
                 sequence:
                   - service: fan.set_percentage
                     target: !input fan_entities
