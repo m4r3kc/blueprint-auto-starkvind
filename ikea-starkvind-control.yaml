@@ -20,7 +20,7 @@ blueprint:
             - fan
             - binary_sensor
     manual_toggle_state:
-      name: Stan przełącznika lub encji ręcznego sterowania
+      name: Stan przełącznika lub encja ręcznego sterowania
       description: Stan, w którym automatyzacja ręcznego sterowania jest wyzwalana (włączony lub wyłączony)
       default: "on"
       selector:
@@ -88,12 +88,17 @@ action:
             target: !input fan_entities
             data:
               preset_mode: auto
-      - conditions: # Zmieniamy 'default' na kolejny 'conditions'
+      - conditions: # Zmieniamy 'above_equal' na 'or' z 'above' i 'equal'
           - condition: template
             value_template: "{{ trigger.id == 'auto_mode_control' }}"
-          - condition: numeric_state
-            entity_id: !input pm2_5_sensor
-            above_equal: !input ppm_threshold # Warunek dla PM2.5 powyżej lub równego progu
+          - condition: or # Używamy 'or'
+            conditions:
+              - condition: numeric_state
+                entity_id: !input pm2_5_sensor
+                above: !input ppm_threshold # Warunek 'powyżej' progu
+              - condition: numeric_state
+                entity_id: !input pm2_5_sensor
+                equal: !input ppm_threshold # Warunek 'równy' progowi
         sequence:
           - service: fan.set_preset_mode
             target: !input fan_entities
