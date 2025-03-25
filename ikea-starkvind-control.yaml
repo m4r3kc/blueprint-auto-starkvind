@@ -74,8 +74,10 @@ action:
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
             below: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest poniżej progu
-          - service: fan.turn_off
+          - service: fan.set_preset_mode
             target: !input fan_entities
+            data:
+              preset_mode: auto
       # Ręczne sterowanie
       - conditions:
           - condition: template
