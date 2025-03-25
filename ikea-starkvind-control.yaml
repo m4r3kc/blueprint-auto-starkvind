@@ -103,7 +103,7 @@ action:
               - conditions:
                   - condition: numeric_state
                     entity_id: !input pm2_5_sensor
-                    above: "{{ float(input_ppm_threshold) + float(input_ppm_increase_threshold) }}" # Sprawdź, czy PM2.5 jest powyżej progu manual
+                    above: "{{ float(inputs.ppm_threshold) + float(inputs.ppm_increase_threshold) }}" # Sprawdź, czy PM2.5 jest powyżej progu manual
                 sequence:
                   - service: fan.set_percentage
                     target: !input fan_entities
