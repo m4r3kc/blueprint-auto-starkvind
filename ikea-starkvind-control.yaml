@@ -1,11 +1,8 @@
 blueprint:
-  name: Manualne sterowanie oczyszczaczem powietrza (wieloma)
+  name: Manualne sterowanie oczyszczaczem powietrza (wieloma) - dynamiczna moc
   description: |
     <br>
-    <b>📘Ten Blueprint włącza oczyszczacze powietrza w trybie manualnym z określoną mocą, gdy poziom PM2.5 przekracza określony próg.</b>
-    <br><br>
-    📅 <b>Przełączniki, encje, obszary</b>: Oczyszczacze powietrza są uruchamiane w trybie manualnym z określoną mocą, gdy poziom PM2.5 przekroczy ustawiony próg.<br>
-    ⏰ <b>Automatyczne wyłączanie</b>: Oczyszczacze powietrza można nadal wyłączyć ręcznie.
+    <b>📘Ten Blueprint dynamicznie dostosowuje moc oczyszczacza powietrza w trybie manualnym w oparciu o przekroczenie poziomu PM2.5 powyżej ustalonego progu.</b>
   domain: automation
   input:
     manual_toggle:
@@ -43,15 +40,6 @@ blueprint:
           min: 1
           max: 120
           step: 1
-    fan_power:
-      name: Moc wentylatora
-      description: Procentowa moc wentylatora w trybie manualnym
-      default: 60
-      selector:
-        number:
-          min: 10
-          max: 100
-          step: 10
     fan_entities:
       name: Oczyszczacze powietrza
       description: Encje, obszary lub urządzenia wybranych oczyszczaczy powietrza
@@ -79,11 +67,15 @@ action:
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
             above: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest powyżej progu
+          - variables:
+              current_pm2_5: "{{ states(trigger.entity_id) | float }}"
+              threshold: !input ppm_threshold
+              fan_power: "{{ ((current_pm2_5 - threshold) / threshold * 100) | min(100) | max(10) }}"  # Oblicz moc wentylatora
           - service: fan.turn_on
             target: !input fan_entities
           - service: fan.set_percentage
             target: !input fan_entities
             data:
-              percentage: !input fan_power
+              percentage: "{{ fan_power }}"
 
 mode: single
