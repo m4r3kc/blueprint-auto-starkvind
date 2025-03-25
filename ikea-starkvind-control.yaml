@@ -74,31 +74,29 @@ condition: []
 
 action:
   - choose:
-      # Automatyczne sterowanie trybem na podstawie PM2.5
+      # Automatyczne sterowanie trybem na podstawie PM2.5 - PONIŻEJ progu
       - conditions:
           - condition: template
             value_template: "{{ trigger.id == 'auto_mode_control' }}"
-        sequence:
-          - delay:
-              minutes: 3
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
             below: !input ppm_threshold
+        sequence:
+          - delay:
+              minutes: 3
           - service: fan.set_preset_mode
             target: !input fan_entities
             data:
               preset_mode: auto
-      - conditions: # Zmieniamy 'above_equal' na 'or' z 'above' i 'equal'
+
+    - choose: # Drugi blok choose na tym samym poziomie - dla PM2.5 POWYŻEJ LUB RÓWNE progu
+      # Automatyczne sterowanie trybem na podstawie PM2.5 - POWYŻEJ LUB RÓWNE progu
+      - conditions:
           - condition: template
             value_template: "{{ trigger.id == 'auto_mode_control' }}"
-          - condition: or # Używamy 'or'
-            conditions:
-              - condition: numeric_state
-                entity_id: !input pm2_5_sensor
-                above: !input ppm_threshold # Warunek 'powyżej' progu
-              - condition: numeric_state
-                entity_id: !input pm2_5_sensor
-                equal: !input ppm_threshold # Warunek 'równy' progowi
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            above_equal: !input ppm_threshold
         sequence:
           - service: fan.set_preset_mode
             target: !input fan_entities
@@ -109,6 +107,7 @@ action:
             data:
               percentage: !input manual_fan_speed_percentage
 
+    - choose: # Trzeci blok choose na tym samym poziomie - dla RĘCZNEGO sterowania
       # Ręczne sterowanie - uruchomienie trybu ręcznego
       - conditions:
           - condition: template
