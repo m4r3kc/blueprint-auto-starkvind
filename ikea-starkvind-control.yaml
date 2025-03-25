@@ -92,14 +92,15 @@ action:
                     data:
                       preset_mode: auto # Przełącz na tryb auto, gdy PM2.5 poniżej progu
               - default: # Jeśli PM2.5 powyżej lub równe progowi
-                  - service: fan.set_preset_mode
-                    target: !input fan_entities
-                    data:
-                      preset_mode: none # Wyłącz tryb auto, aby ustawić tryb ręczny
-                  - service: fan.set_percentage
-                    target: !input fan_entities
-                    data:
-                      percentage: !input manual_fan_speed_percentage # Ustaw tryb ręczny z zadaną mocą
+                  - sequence: # Dodajemy explicit 'sequence' pod 'default'
+                      - service: fan.set_preset_mode
+                        target: !input fan_entities
+                        data:
+                          preset_mode: none # Wyłącz tryb auto, aby ustawić tryb ręczny
+                      - service: fan.set_percentage
+                        target: !input fan_entities
+                        data:
+                          percentage: !input manual_fan_speed_percentage # Ustaw tryb ręczny z zadaną mocą
 
       # Ręczne sterowanie - uruchomienie trybu ręcznego
       - conditions:
