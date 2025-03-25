@@ -1,0 +1,127 @@
+blueprint:
+  name: Inteligentne sterowanie trybem oczyszczacza powietrza (wieloma)
+  description: |
+    <br>
+    <b>📘Ten Blueprint steruje trybem pracy wielu oczyszczaczy powietrza na podstawie encji, przełączników lub ręcznych przełączników na urządzeniu. Przełącza oczyszczacz w tryb "auto" gdy poziom PM2.5 jest niski, a w tryb "ręczny" z ustawioną mocą, gdy poziom PM2.5 jest wysoki. Opóźnienie po wykonaniu akcji wynosi 3 minuty.</b>
+    <br><br>
+    📅 <b>Przełączniki, encje, obszary</b>: Oczyszczacze powietrza są sterowane trybem pracy przez przełącznik, encję lub obszar i automatycznie przełączane w tryb "auto" po osiągnięciu ustawionego poziomu jakości powietrza.<br>
+    ⏰ <b>Automatyczne przełączanie trybów</b>: Oczyszczacze powietrza są automatycznie przełączane w tryb "auto" lub "ręczny" w zależności od ustawionego poziomu jakości powietrza i ręcznego uruchomienia na urządzeniu.
+  domain: automation
+  input:
+    manual_toggle:
+      name: Przełącznik lub encja ręcznego sterowania
+      description: Przełącznik lub encja do ręcznego uruchomienia trybu ręcznego oczyszczacza powietrza (automatyczny powrót do trybu auto).
+      selector:
+        entity:
+          domain:
+            - input_boolean
+            - switch
+            - light
+            - fan
+            - binary_sensor
+    manual_toggle_state:
+      name: Stan przełącznika lub encji ręcznego sterowania
+      description: Stan, w którym automatyzacja ręcznego sterowania jest wyzwalana (włączony lub wyłączony)
+      default: "on"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+    pm2_5_sensor:
+      name: Czujnik PM2.5
+      description: Czujnik PM2.5 dla oczyszczaczy powietrza
+      selector:
+        entity:
+          domain: sensor
+    ppm_threshold:
+      name: Próg PM2.5
+      description: Próg (PPM) dla przełączania oczyszczacza w tryb "auto"
+      default: 50
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+    fan_entities:
+      name: Oczyszczacze powietrza
+      description: Encje, obszary lub urządzenia wybranych oczyszczaczy powietrza
+      selector:
+        target:
+          entity:
+            domain: fan
+    manual_fan_speed_percentage:
+      name: Procent mocy wentylatora w trybie ręcznym
+      description: Ustaw procent mocy wentylatora, gdy oczyszczacz przechodzi w tryb ręczny (wartość 1-100)
+      default: 70
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+
+trigger:
+  - platform: state
+    entity_id: !input pm2_5_sensor
+    id: auto_mode_control
+  - platform: state
+    entity_id: !input manual_toggle
+    to: !input manual_toggle_state
+    id: manual_mode_request
+
+condition: []
+
+action:
+  - choose:
+      # Automatyczne sterowanie trybem na podstawie PM2.5
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'auto_mode_control' }}"
+        sequence:
+          - delay:
+              minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5
+          - choose:
+              - conditions:
+                  - condition: numeric_state
+                    entity_id: !input pm2_5_sensor
+                    below: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest poniżej progu
+                sequence:
+                  - service: fan.set_preset_mode
+                    target: !input fan_entities
+                    data:
+                      preset_mode: auto # Przełącz na tryb auto, gdy PM2.5 poniżej progu
+              - default: # Jeśli PM2.5 powyżej lub równe progowi
+                  - service: fan.set_preset_mode
+                    target: !input fan_entities
+                    data:
+                      preset_mode: none # Wyłącz tryb auto, aby ustawić tryb ręczny
+                  - service: fan.set_percentage
+                    target: !input fan_entities
+                    data:
+                      percentage: !input manual_fan_speed_percentage # Ustaw tryb ręczny z zadaną mocą
+
+      # Ręczne sterowanie - uruchomienie trybu ręcznego
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'manual_mode_request' }}"
+        sequence:
+          - service: fan.set_preset_mode
+            target: !input fan_entities
+            data:
+              preset_mode: none # Wyłącz tryb auto na początku trybu ręcznego
+          - service: fan.set_percentage
+            target: !input fan_entities
+            data:
+              percentage: !input manual_fan_speed_percentage # Ustaw tryb ręczny z zadaną mocą
+          - delay:
+              minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5 po ręcznym włączeniu
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            below: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 spadła poniżej progu po ręcznym włączeniu
+          - service: fan.set_preset_mode
+            target: !input fan_entities
+            data:
+              preset_mode: auto # Powrót do trybu auto, gdy PM2.5 spadnie poniżej progu nawet po ręcznym włączeniu
+
+mode: single
