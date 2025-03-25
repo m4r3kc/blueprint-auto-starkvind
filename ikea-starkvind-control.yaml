@@ -1,12 +1,15 @@
 blueprint:
-  name: Automatyczne sterowanie oczyszczaczem powietrza (wieloma) z trybem manualnym
+  name: Manualne sterowanie oczyszczaczem powietrza (wieloma)
   description: |
     <br>
-    <b>📘Ten Blueprint włącza i automatycznie steruje trybem oczyszczaczy powietrza na podstawie encji, przełączników lub ręcznych przełączników na urządzeniu oraz poziomu PM2.5.</b>
+    <b>📘Ten Blueprint włącza oczyszczacze powietrza w trybie manualnym z określoną mocą, gdy poziom PM2.5 przekracza określony próg.</b>
+    <br><br>
+    📅 <b>Przełączniki, encje, obszary</b>: Oczyszczacze powietrza są uruchamiane w trybie manualnym z określoną mocą, gdy poziom PM2.5 przekroczy ustawiony próg.<br>
+    ⏰ <b>Automatyczne wyłączanie</b>: Oczyszczacze powietrza można nadal wyłączyć ręcznie.
   domain: automation
   input:
     manual_toggle:
-      name: Przełącznik lub encja manualna
+      name: Przełącznik lub encja
       description: Przełącznik lub encja do ręcznego włączania oczyszczacza powietrza.
       selector:
         entity:
@@ -17,8 +20,8 @@ blueprint:
             - fan
             - binary_sensor
     manual_toggle_state:
-      name: Stan przełącznika lub encji manualnej
-      description: Stan, w którym automatyzacja manualna jest wyzwalana (włączony lub wyłączony)
+      name: Stan przełącznika lub encji
+      description: Stan, w którym automatyzacja jest wyzwalana (włączony lub wyłączony)
       default: "on"
       selector:
         select:
@@ -32,32 +35,23 @@ blueprint:
         entity:
           domain: sensor
     ppm_threshold:
-      name: Próg PM2.5 dla trybu auto
-      description: Próg (PPM) dla przełączenia oczyszczaczy powietrza w tryb auto.
+      name: Próg PM2.5
+      description: Próg (PPM) do włączania oczyszczaczy powietrza
       default: 50
       selector:
         number:
           min: 1
           max: 120
           step: 1
-    ppm_increase_threshold:
-      name: Próg wzrostu PM2.5 dla trybu manualnego
-      description: Próg wzrostu (PPM) powyżej progu auto, dla przełączenia w tryb manualny.
-      default: 30
-      selector:
-        number:
-          min: 1
-          max: 120
-          step: 1
-    manual_mode_percentage:
-      name: Procent mocy w trybie manualnym
-      description: Procent mocy wentylatora ustawiany w trybie manualnym (0-100).
+    fan_power:
+      name: Moc wentylatora
+      description: Procentowa moc wentylatora w trybie manualnym
       default: 60
       selector:
         number:
-          min: 0
+          min: 10
           max: 100
-          step: 1
+          step: 10
     fan_entities:
       name: Oczyszczacze powietrza
       description: Encje, obszary lub urządzenia wybranych oczyszczaczy powietrza
@@ -69,56 +63,27 @@ blueprint:
 trigger:
   - platform: state
     entity_id: !input pm2_5_sensor
-    id: pm25_change
-  - platform: state
-    entity_id: !input manual_toggle
-    to: !input manual_toggle_state
-    id: manual
+    id: automanual
 
 condition: []
 
 action:
   - choose:
+      # Automatyczne sterowanie oparte na PM2.5
       - conditions:
           - condition: template
-            value_template: "{{ trigger.id == 'pm25_change' }}"
+            value_template: "{{ trigger.id == 'automanual' }}"
         sequence:
           - delay:
-              minutes: 3
-          - choose:
-              - conditions:
-                  - condition: numeric_state
-                    entity_id: !input pm2_5_sensor
-                    below: !input ppm_threshold
-                sequence:
-                  - service: fan.set_preset_mode
-                    target: !input fan_entities
-                    data:
-                      preset_mode: auto
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {{
-                        states('sensor.' + trigger.to_state.entity_id.split('.')[1]) | float >
-                        (ppm_threshold + ppm_increase_threshold)
-                      }}
-                sequence:
-                  - service: fan.set_percentage
-                    target: !input fan_entities
-                    data:
-                      percentage: !input manual_mode_percentage
-            default: []
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'manual' }}"
-        sequence:
-          - service: fan.turn_on
-            target: !input fan_entities
-          - delay:
-              minutes: 3
+              minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
-            below: !input ppm_threshold
-          - service: fan.turn_off
+            above: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest powyżej progu
+          - service: fan.turn_on
             target: !input fan_entities
+          - service: fan.set_percentage
+            target: !input fan_entities
+            data:
+              percentage: !input fan_power
+
 mode: single
