@@ -1,8 +1,11 @@
 blueprint:
-  name: Manualne sterowanie oczyszczaczem powietrza (wieloma) - dynamiczna moc
+  name: Manualne sterowanie oczyszczaczem powietrza (wieloma)
   description: |
     <br>
-    <b>📘Ten Blueprint dynamicznie dostosowuje moc oczyszczacza powietrza w trybie manualnym w oparciu o przekroczenie poziomu PM2.5 powyżej ustalonego progu.</b>
+    <b>📘Ten Blueprint włącza oczyszczacze powietrza w trybie manualnym z określoną mocą, gdy poziom PM2.5 mieści się w zdefiniowanym zakresie.</b>
+    <br><br>
+    📅 <b>Przełączniki, encje, obszary</b>: Oczyszczacze powietrza są uruchamiane w trybie manualnym z określoną mocą, gdy poziom PM2.5 znajduje się w zdefiniowanym zakresie.<br>
+    ⏰ <b>Automatyczne wyłączanie</b>: Oczyszczacze powietrza można nadal wyłączyć ręcznie.
   domain: automation
   input:
     manual_toggle:
@@ -31,15 +34,33 @@ blueprint:
       selector:
         entity:
           domain: sensor
-    ppm_threshold:
-      name: Próg PM2.5
-      description: Próg (PPM) do włączania oczyszczaczy powietrza
+    ppm_threshold_min:
+      name: Minimalny próg PM2.5
+      description: Minimalny próg (PPM) do włączania oczyszczaczy powietrza
       default: 50
       selector:
         number:
           min: 1
           max: 120
           step: 1
+    ppm_threshold_max:
+      name: Maksymalny próg PM2.5
+      description: Maksymalny próg (PPM) do uruchamiania oczyszczaczy powietrza
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+    fan_power:
+      name: Moc wentylatora
+      description: Procentowa moc wentylatora w trybie manualnym
+      default: 60
+      selector:
+        number:
+          min: 10
+          max: 100
+          step: 10
     fan_entities:
       name: Oczyszczacze powietrza
       description: Encje, obszary lub urządzenia wybranych oczyszczaczy powietrza
@@ -66,16 +87,13 @@ action:
               minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
-            above: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest powyżej progu
-          - variables:
-              current_pm2_5: "{{ states(trigger.entity_id) | float }}"
-              threshold: !input ppm_threshold
-              fan_power: "{{ ((current_pm2_5 - threshold) / threshold * 100) | min(100) | max(10) }}"  # Oblicz moc wentylatora
+            above: !input ppm_threshold_min  # Sprawdź, czy wartość PM2.5 jest powyżej minimalnego progu
+            below: !input ppm_threshold_max  # Sprawdź, czy wartość PM2.5 jest poniżej maksymalnego progu
           - service: fan.turn_on
             target: !input fan_entities
           - service: fan.set_percentage
             target: !input fan_entities
             data:
-              percentage: "{{ fan_power }}"
+              percentage: !input fan_power
 
 mode: single
