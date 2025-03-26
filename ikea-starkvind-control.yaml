@@ -1,96 +1,96 @@
 blueprint:
-  name: Automatyczne sterowanie oczyszczaczem powietrza (wieloma)
-  description: |
-    <br>
-    <b>📘Ten Blueprint włącza i automatycznie wyłącza wiele oczyszczaczy powietrza na podstawie encji, przełączników lub ręcznych przełączników na urządzeniu. Opóźnienie po wykonaniu akcji wynosi 3 minuty.</b>
-    <br><br>
-    📅 <b>Przełączniki, encje, obszary</b>: Oczyszczacze powietrza są włączane przez przełącznik, encję lub obszar i automatycznie wyłączane po osiągnięciu ustawionego poziomu jakości powietrza.<br>
-    ⏰ <b>Automatyczne wyłączanie</b>: Oczyszczacze powietrza są automatycznie wyłączane po osiągnięciu ustawionego poziomu jakości powietrza i ręcznym uruchomieniu na urządzeniu.
+  name: Sterowanie mocą oczyszczacza powietrza IKEA Starkvind na podstawie PM2.5
+  description: Automatyczna regulacja mocy oczyszczacza powietrza IKEA Starkvind w zależności od odczytu PM2.5.
   domain: automation
   input:
-    manual_toggle:
-      name: Przełącznik lub encja
-      description: Przełącznik lub encja do ręcznego włączania oczyszczacza powietrza (wyłączanie automatyczne).
-      selector:
-        entity:
-          domain:
-            - input_boolean
-            - switch
-            - light
-            - fan
-            - binary_sensor
-    manual_toggle_state:
-      name: Stan przełącznika lub encji
-      description: Stan, w którym automatyzacja jest wyzwalana (włączony lub wyłączony)
-      default: "on"
-      selector:
-        select:
-          options:
-            - "on"
-            - "off"
     pm2_5_sensor:
       name: Czujnik PM2.5
       description: Czujnik PM2.5 dla oczyszczaczy powietrza
       selector:
         entity:
-          domain: sensor
-    ppm_threshold:
-      name: Próg PM2.5
-      description: Próg (PPM) dla wyłączania oczyszczaczy powietrza
-      default: 50
-      selector:
-        number:
-          min: 1
-          max: 120
-          step: 1
+          domain:
+          - sensor
     fan_entities:
       name: Oczyszczacze powietrza
-      description: Encje, obszary lub urządzenia wybranych oczyszczaczy powietrza
+      description: Wybierz encje, obszary lub urządzenia oczyszczaczy powietrza
       selector:
         target:
           entity:
-            domain: fan
+          - domain:
+            - fan
 
 trigger:
   - platform: state
     entity_id: !input pm2_5_sensor
-    id: autooff
-  - platform: state
-    entity_id: !input manual_toggle
-    to: !input manual_toggle_state
-    id: manual
 
 condition: []
 
 action:
+  - variables:
+      pm_value: "{{ states(trigger.entity_id) | float }}"
   - choose:
-      # Automatyczne sterowanie oparte na PM2.5
       - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'autooff' }}"
-        sequence:
-          - delay:
-              minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
-            below: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest poniżej progu
+            below: 10
+        sequence:
           - service: fan.set_preset_mode
             target: !input fan_entities
             data:
               preset_mode: auto
-      # Ręczne sterowanie
       - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'manual' }}"
-        sequence:
-          - service: fan.turn_on
-            target: !input fan_entities
-          - delay:
-              minutes: 3  # Poczekaj 3 minuty, aby ustalić rzeczywistą wartość PM2.5
           - condition: numeric_state
             entity_id: !input pm2_5_sensor
-            below: !input ppm_threshold  # Sprawdź, czy wartość PM2.5 jest poniżej progu
-          - service: fan.turn_off
+            below: 14
+        sequence:
+          - service: fan.set_percentage
             target: !input fan_entities
+            data:
+              percentage: 20
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            below: 18
+        sequence:
+          - service: fan.set_percentage
+            target: !input fan_entities
+            data:
+              percentage: 30
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            below: 24
+        sequence:
+          - service: fan.set_percentage
+            target: !input fan_entities
+            data:
+              percentage: 40
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            below: 31
+        sequence:
+          - service: fan.set_percentage
+            target: !input fan_entities
+            data:
+              percentage: 60
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            below: 51
+        sequence:
+          - service: fan.set_percentage
+            target: !input fan_entities
+            data:
+              percentage: 80
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input pm2_5_sensor
+            above: 50
+        sequence:
+          - service: fan.set_percentage
+            target: !input fan_entities
+            data:
+              percentage: 100
 
 mode: single
