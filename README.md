@@ -57,4 +57,6 @@ Blueprint ten służy do automatyzacji sterowania prędkością oczyszczacza pow
 </ul>
 <p>(TAGI: HomeAssistant, IkeaStarkvind, Automation, PM2_5, AirPurifier, Blueprint)</p>
 
-<a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fjayjojayson%2Fblueprint-auto-luftreiniger%2Fmain%2FLuftreiniger-ausschalten-bei-bestimmten-Luftwert.yaml"><img width="250" alt="blueprint" src="https://github.com/user-attachments/assets/fa01530a-1d52-4b2b-b637-1269bd0cd747"></a>
+<a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fm4r3kc%2Fblueprint-auto-starkvind%2Frefs%2Fheads%2Fmain%2Fikea-starkvind-control.yaml">
+  <img width="250" alt="blueprint" src="https://github.com/user-attachments/assets/fa01530a-1d52-4b2b-b637-1269bd0cd747">
+</a>
